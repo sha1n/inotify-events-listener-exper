@@ -1,9 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"github.com/sha1n/inotify-events-listener-exper/parser"
+	"github.com/sha1n/inotify-events-listener-exper/handlers"
 	"net"
 )
 
@@ -14,16 +13,16 @@ const HandlerCount = 2
 func main() {
 	fmt.Println("Launching TCP server...")
 
-	eventQueue := make(chan *parser.Event, EventBufferSize)
+	eventQueue := make(chan handlers.FileChangeEvent, EventBufferSize)
 	startEventHandlers(eventQueue)
-	acceptConnections(eventQueue)
+	startAcceptingEvents(eventQueue)
 }
 
-func acceptConnections(eventQueue chan *parser.Event) {
+func startAcceptingEvents(eventQueue chan handlers.FileChangeEvent) {
 	localServerAddress := fmt.Sprintf(":%d", ServerPort)
 	ln, err := net.Listen("tcp", localServerAddress)
 	if err != nil {
-		fmt.Println( "Failed to open server socket on port", ServerPort, err)
+		fmt.Println("Failed to open server socket on port", ServerPort, err)
 	}
 
 	for {
@@ -32,35 +31,12 @@ func acceptConnections(eventQueue chan *parser.Event) {
 			fmt.Println("Failed to accept incoming connection:", err)
 			panic(err)
 		}
-		go handleClientConnection(conn, eventQueue)
+		go handlers.HandleClientConnection(conn, eventQueue)
 	}
 }
 
-func startEventHandlers(eventQueue chan *parser.Event) {
+func startEventHandlers(eventQueue chan handlers.FileChangeEvent) {
 	for i := 0; i < HandlerCount; i++ {
-		go handleEvents(eventQueue)
-	}
-}
-
-func handleEvents(queue chan *parser.Event) {
-	for event := range queue {
-		fmt.Println(event) // todo: replay locally...
-		fmt.Println()
-	}
-}
-
-func handleClientConnection(conn net.Conn, queue chan *parser.Event) {
-	for {
-		scanner := bufio.NewScanner(bufio.NewReader(conn))
-		scanner.Split(bufio.ScanLines)
-		for scanner.Scan() {
-			eventParser := parser.NewParser()
-			event, e := eventParser.Parse(scanner.Text())
-			if e != nil {
-				panic(e)
-			} else {
-				queue<-event
-			}
-		}
+		go handlers.StartDispatchEvents(eventQueue)
 	}
 }
