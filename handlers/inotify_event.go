@@ -1,12 +1,21 @@
 package handlers
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
+
+const expectedRootDir = "/sync-data/outputs/"          // fixme shai: out to config
+const localRootDir = "/bazel-rsynced-outputs/outputs/" // fixme shai: out to config
 
 type FileChangeEvent interface {
 	Dir() string
 	File() string
 	Types() []EventType
 	String() string
+	HasType(t EventType) bool
+	LocalFilePath() string
+	RelativeFilePath() string
 }
 
 type EventType int
@@ -29,7 +38,7 @@ const (
 	EtUnmount      EventType = 14
 )
 
-var names = []string {
+var names = []string{
 	"ACCESS",
 	"MODIFY",
 	"ATTRIB",
@@ -46,7 +55,6 @@ var names = []string {
 	"DELETE_SELF",
 	"UNMOUNT",
 }
-
 
 type INotifyEvent struct {
 	dir   string
@@ -66,6 +74,16 @@ func (e *INotifyEvent) Types() []EventType {
 	return e.types
 }
 
+func (e *INotifyEvent) HasType(t EventType) bool {
+	for i := range e.types {
+		if e.types[i] == t {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (e *INotifyEvent) String() string {
 	return fmt.Sprintf(
 		`event :
@@ -75,6 +93,22 @@ types : %s`,
 		e.dir,
 		e.file,
 		e.types)
+}
+
+func (e *INotifyEvent) LocalFilePath() string {
+	if !strings.HasPrefix(e.dir, expectedRootDir) {
+		panic("Unexpected dir path: " + e.dir)
+	}
+
+	return localRootDir + strings.TrimPrefix(e.dir, expectedRootDir) + e.file
+}
+
+func (e *INotifyEvent) RelativeFilePath() string {
+	if !strings.HasPrefix(e.dir, expectedRootDir) {
+		panic("Unexpected dir path: " + e.dir)
+	}
+
+	return strings.TrimPrefix(e.dir, expectedRootDir) + e.file
 }
 
 func (t EventType) String() string {
