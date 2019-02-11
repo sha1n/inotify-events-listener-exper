@@ -20,4 +20,3 @@ func HandleClientConnection(conn net.Conn, queue chan FileChangeEvent) {
 		}
 	}
 }
-

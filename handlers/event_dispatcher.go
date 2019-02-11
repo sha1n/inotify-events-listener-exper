@@ -3,48 +3,29 @@ package handlers
 import (
 	"fmt"
 	"os"
-	"strings"
 )
 
 func StartDispatchEvents(queue chan FileChangeEvent) {
+	syncHandler := NewSyncHandler()
+	syncHandler.Start()
 	for event := range queue {
-		//fmt.Println(event) // todo: replay locally...
-		if strings.HasSuffix(event.File(), ".txt") ||
-			strings.HasSuffix(event.File(), ".jar") ||
-			strings.HasSuffix(event.File(), ".srcjar") ||
-			strings.HasSuffix(event.File(), ".xml") {
-			if event.HasType(EtDelete) || event.HasType(EtMovedFrom) {
+		//if strings.HasSuffix(event.File(), ".txt") ||
+		//	strings.HasSuffix(event.File(), ".jar") ||
+		//	strings.HasSuffix(event.File(), ".srcjar") ||
+		//	strings.HasSuffix(event.File(), ".xml") {
+			if event.HasType(EtDelete) || event.HasType(EtDeleteSelf) || event.HasType(EtMovedFrom) {
 				err := remove(event.LocalFilePath())
 				if err != nil {
 					fmt.Println("ERROR:", err)
 				}
 			} else {
-				err := markForSync(event.RelativeFilePath())
-				if err != nil {
-					fmt.Println("ERROR:", err)
-				}
+				syncHandler.RegisterRelativePath(event.RelativeFilePath())
 
 			}
-			//fmt.Println()
-		}
+		//}
 	}
 }
 
 func remove(path string) error {
 	return os.RemoveAll(path)
-}
-
-func markForSync(path string) error {
-	f, err := os.OpenFile("/tmp/rsync.spec", os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		return err
-	}
-
-	defer f.Close()
-
-	if _, err = f.WriteString(fmt.Sprintf("%s\r\n", path)); err != nil {
-		return err
-	}
-
-	return nil
 }
